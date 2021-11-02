@@ -6,7 +6,7 @@ import json
 app = Flask(__name__)
 
 app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'yourpassword'
+app.config['MYSQL_PASSWORD'] = 'your_password'
 app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_DB'] = 'rte'
 app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
@@ -17,23 +17,33 @@ mysql = MySQL(app)
 def index(): 
     cur = mysql.connection.cursor()
 
-    cur.execute('''SELECT COUNT(*) AS NBROW FROM October30;''')
+    cur.execute('''
+    SELECT COUNT(*) AS NBROW 
+    FROM October30;''')
 
     results=cur.fetchall()
     size=results[0]['NBROW']-1
 
-    cur.execute('''select id, from_unixtime((conso_date-25568+heures-(1/24))*24*3600, '%Y-%m-%dT%H:%i') as date_converted, consommation
-    from October30;''')
+    cur.execute('''
+    SELECT id, 
+    FROM_UNIXTIME((conso_date-25568+heures-(1/24))*24*3600, '%Y-%m-%dT%H:%i') AS date_converted, 
+    consommation
+    FROM October30;''')
 
-    n = int(request.args.get('n'))
+    param = request.args.get('n')
+    data = {}
 
-    if n>=1 and n<int(size/4)+1 :
-        results=cur.fetchall()
-        data = {}
-        for i in range(4*n-1,-1,-1) :
-            data[str(results[size-i]['date_converted'])] = results[size-i]['consommation']
+    if param is None :
+        data['Error'] = 'Please specify a value for n'
 
-        return json.dumps(data)
-    
     else :
-        return "The parameter n is out of range !"
+        n=int(param)
+        if n>=1 and n<int(size/4)+2 :
+            results=cur.fetchall()
+            for i in range(4*n-1,-1,-1) :
+                data[str(results[size-i]['date_converted'])] = results[size-i]['consommation']
+        
+        else :   
+            data['Error'] = 'The parameter n is out of range !'
+
+    return json.dumps(data)
