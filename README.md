@@ -13,4 +13,3 @@ A little exercise that fetches data from RTE.
 
 - Implement a SQL instance on Docker, so that it runs with "docker-compose up" only. This will help us get rid of manually entering the password in the code, too.
 - Query only the n last hours instead of all the data in the SQL command, for performance purposes
-- 
