@@ -23,20 +23,21 @@ def index():
 
     results=cur.fetchall()
     size=results[0]['NBROW']-1
-
-    cur.execute('''
-    SELECT id, 
-    FROM_UNIXTIME((conso_date-25568+heures-(1/24))*24*3600, '%Y-%m-%dT%H:%i') AS date_converted, 
-    consommation
-    FROM October30;''')
-
-    param = request.args.get('n')
+    
     data = {}
 
-    if param is None :
-        data['Error'] = 'Please specify a value for n'
+    try :
+        param = request.args.get('n')
 
-    else :
+        cur.execute('''
+        SELECT
+        FROM_UNIXTIME(timestamp, '%Y-%m-%dT%H:%i') AS date_converted, 
+        consommation
+        FROM October30
+        WHERE timestamp > UNIX_TIMESTAMP() - %n * 3600
+        ORDER BY timestamp DESC;''', 
+        {'n' : param})
+
         n=int(param)
         if n>=1 and n<int(size/4)+2 :
             results=cur.fetchall()
@@ -45,5 +46,8 @@ def index():
         
         else :   
             data['Error'] = 'The parameter n is out of range !'
+
+    except request.args.get('n')==None:
+            data['Error'] = 'Please specify a value for n'
 
     return json.dumps(data)
