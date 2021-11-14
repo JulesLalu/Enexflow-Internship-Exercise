@@ -1,4 +1,5 @@
 CREATE DATABASE IF NOT EXISTS rte;
+use rte;
 
 CREATE TABLE October30 {
     time_stamp INT

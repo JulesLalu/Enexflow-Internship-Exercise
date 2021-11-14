@@ -1,10 +1,18 @@
 version: '3.4'
 
 services:
-  enexflowinternshipexercise:
-    image: enexflowinternshipexercise
-    build:
-      context: .
-      dockerfile: ./Dockerfile
+  app:
+    build: ./app
+    links:
+      - db
     ports:
-      - 5000:5000
+      - "5000:5000"
+
+  db:
+    image: mysql:8.0.21
+    ports:
+      - "30000:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: Crefolet75$$
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d/:ro
