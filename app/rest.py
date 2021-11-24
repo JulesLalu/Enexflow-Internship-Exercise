@@ -11,29 +11,33 @@ def index():
     cursor = conn.cursor(pymysql.cursors.DictCursor)
     
     data = {}
-
+    rq=request.args.get('n')
     try :
-        n = int(request.args.get('n'))
+        n = int(rq)
 
         if n>=1 :
 
             cursor.execute('''
             SELECT
-            FROM_UNIXTIME(timestamp, '%Y-%m-%dT%H:%i') AS date_converted, 
+            FROM_UNIXTIME(timestamp1, '%%Y-%%m-%%dT%%H:%%i') AS date_converted, 
             consommation
-            FROM October30
-            WHERE timestamp > UNIX_TIMESTAMP() - %n * 3600
-            ORDER BY timestamp DESC;''', 
+            FROM RTE_dATA
+            WHERE timestamp1 > UNIX_TIMESTAMP() - %(n)s * 3600
+            ORDER BY timestamp1 DESC;''', 
             {'n' : n})
 
             results=cursor.fetchall()
-            for i in range(len(results[:][0])) :
-                data[str(results[i]['timestamp'])] = results[i]['consommation']
+            for i in range(len(results)) :
+                data[str(results[i]['date_converted'])] = results[i]['consommation']
         
         else :   
             data['Error'] = 'The parameter n is out of range !'
 
-    except request.args.get('n')==None:
+    except Exception as e:
+        if rq==None :
             data['Error'] = 'Please specify a value for n'
 
     return json.dumps(data)
+
+if __name__ == "__main__":
+    app.run(debug=True,host='0.0.0.0')

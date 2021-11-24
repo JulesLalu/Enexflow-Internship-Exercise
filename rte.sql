@@ -1,14 +1,22 @@
 CREATE DATABASE IF NOT EXISTS rte;
 use rte;
 
-CREATE TABLE October30 {
-    time_stamp INT
-    consommation INT NOT NULL,
-    PRIMARY KEY (time_stamp)
-};
+CREATE TABLE RTE_DATA (
+    timestamp1 BIGINT NOT NULL,
+    consommation INT,
+    PRIMARY KEY (timestamp1)
+);
+
+DROP TABLE RTE_DATA;
+DELETE FROM RTE_DATA;
 
 LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/RTE_data.csv'
-INTO TABLE October30 
+INTO TABLE RTE_DATA 
 FIELDS TERMINATED BY ';' 
 LINES TERMINATED BY '\n'
-IGNORE 1 ROWS;
+IGNORE 1 ROWS
+;
+
+
+SELECT * FROM rte_data
+
