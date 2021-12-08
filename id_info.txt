@@ -1,0 +1,4 @@
+User : root
+Password : Crefolet75$
+DB : rte
+Host : 127.0.0.1
