@@ -1,53 +1,104 @@
 from zipfile import ZipFile
 from io import BytesIO
 from datetime import datetime
+from io import TextIOWrapper
 import threading
 import numpy as np
+import httplib2
+import csv
+from db import mysql
+import pymysql
 
-def update_db(h, cursor) : 
 
+class Datapoint :
+    def __init__(self, timestamp, consommation):
+        self.timestamp = timestamp
+        self.consommation = consommation
+        
+def download_data(h : httplib2.Http):
+    '''
+    This function downloads data from RTE url and returns the content as bytes
+    '''
     actual_date = datetime.today().strftime('%d/%m/%Y')
     response, content = h.request('https://eco2mix.rte-france.com/curves/eco2mixDl?date={}'.format(actual_date))
+    return content
 
+def parse_data(content : bytes) :
+    '''
+    This function takes as input the data content as bytes, and returns it as a raw list of dictionaries, with every column of the initial file
+    '''
     zipfile = ZipFile(BytesIO(content))
-    l = [[]]
-
     with zipfile.open(zipfile.namelist()[0]) as a_file : 
-        for line in a_file.readlines():
-            l.append(line.decode('latin-1').split("\t"))
+        spamreader = csv.DictReader(TextIOWrapper(a_file, 'latin-1'), delimiter = '\t')
+        list_elmt = [row for row in spamreader]
+    return list_elmt
 
-    del l[0]
-    l[0]=['Timestamp', 'Consommation']
-    del l[-1]
-    i=1
-    while l[i][4]!='':
-        # suppression des colonnes inutiles
-        del l[i][0:2]
-        del l[i][3:]
-        # passage en timestamp
-        date_time_str = l[i][0] + " " + l[i][1]
-        date_time_obj = datetime.strptime(date_time_str, '%Y-%m-%d %H:%M')
-        timestamp = datetime.timestamp(date_time_obj)
-        del l[i][0]
-        l[i][0],l[i][1] = int(timestamp), int(l[i][1])
-        # on sort de la boucle si l'excel est rempli jusqu'à 23h45
-        if i == len(l)-1 :
+def into_timestamp(date : str, time : str) :
+    '''
+    This function converts a date + hours into a timestamp
+    '''
+    date_time_str = date + " " + time
+    date_time_obj = datetime.strptime(date_time_str, '%Y-%m-%d %H:%M')
+    timestamp = int(datetime.timestamp(date_time_obj))
+    return timestamp
+
+def conso_datapoint(spamreader : csv.DictReader) :
+    '''
+    A generator that takes into argument the raw list and returns a Datapoint with a timestamp and consumption number
+    '''
+    for row in spamreader :
+        if row['Heures']==None or row['Consommation']=='' :
             break
+        data_elmt = Datapoint(0,0)
+        data_elmt.timestamp = into_timestamp(row['Date'],row['Heures'])
+        data_elmt.consommation = int(row['Consommation'])
+        yield data_elmt
 
-        i+=1
-    del l[i:]
+def final_dataset(spamreader : csv.DictReader) :
+    '''
+    This function takes into argument the raw list of dictionaries and returns its data in its final shape
+    '''
+    gen_datapoint = conso_datapoint(spamreader)
+    final_shape =[{'Timestamp' : row.timestamp , 'Consommation' : row.consommation} for row in gen_datapoint]
+    return final_shape
 
-    np.savetxt("RTE_data.csv",l, delimiter = ', ',fmt ='% s')
-    
+def add_table(cursor) :
+    '''
+    This function creates the RTE_DATA table if it does not exist
+    '''
     cursor.execute('''CREATE TABLE IF NOT EXISTS RTE_DATA (
     timestamp1 BIGINT NOT NULL,
     consommation INT,
     PRIMARY KEY (timestamp1));''')
 
-    cursor.execute('''LOAD DATA INFILE 'RTE_data.csv' IGNORE
-    INTO TABLE RTE_DATA 
-    FIELDS TERMINATED BY ',' 
-    LINES TERMINATED BY '\n'
-    IGNORE 1 ROWS;''')
-    #threading.Timer(15*60, update_db).start()
+def add_to_db(final, cursor) :
+    '''
+    This function adds the data in its final shape to the table
+    '''
+    for dict in final :
+        cursor.execute('''INSERT INTO RTE_DATA (timestamp1,consommation)
+        SELECT * FROM (SELECT %(Timestamp)s AS timestamp1, %(Consommation)s AS consommation) AS temp
+        WHERE NOT EXISTS (
+        SELECT timestamp1 FROM RTE_DATA WHERE timestamp1 = %(Timestamp)s) 
+        LIMIT 1;''', dict)
+        print("success")
+
+def update_db(cursor, h) : 
+    '''
+    This function concatenates the previous functions
+    '''
+    add_table(cursor)
+    print("hello")
+    file = download_data(h)
+    dataset_raw = parse_data(file)
+    final = final_dataset(dataset_raw)
+    add_to_db(final,cursor)
+    return None
+
+
+#formatage de requête sql
+#sur 1 serveur, on met base de données
+#sur 1 autre, on fait programme Python
+#en prod, il y a plusieurs serveurs différents
+
 

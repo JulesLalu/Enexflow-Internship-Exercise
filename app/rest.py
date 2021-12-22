@@ -1,19 +1,36 @@
 import pymysql
 import httplib2
+from modifxlsl import *
 from app import app
-import modifxlsl
 from db import mysql
 from flask import json
 from flask import request
 import cryptography
 
+import asyncio
 
-h = httplib2.Http('.cache')
+h : httplib2.Http = httplib2.Http('.cache')
 
 conn = mysql.connect()
 cursor = conn.cursor(pymysql.cursors.DictCursor)
 
-modifxlsl.update_db(h, cursor)
+def periodic(period):
+    def scheduler(fcn):
+
+        async def wrapper(*args, **kwargs):
+
+            while True:
+                asyncio.create_task(fcn(*args, **kwargs))
+                await asyncio.sleep(period)
+
+        return wrapper
+
+    return scheduler
+
+
+@periodic(15*60)
+async def update(*args, **kwargs):
+    update_db(*args,**kwargs)
 
 @app.route('/electricity_consumption/')
 def index(): 
@@ -50,5 +67,7 @@ def index():
 
     return json.dumps(data)
 
-if __name__ == "__main__":
-    app.run(debug=True,host='0.0.0.0')
+if __name__ == '__main__':
+    app.run()
+    asyncio.run(update(cursor,h))
+

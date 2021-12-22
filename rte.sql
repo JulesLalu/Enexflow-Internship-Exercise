@@ -14,8 +14,13 @@ LOAD IGNORE DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/RTE_data.
 INTO TABLE RTE_DATA 
 FIELDS TERMINATED BY ',' 
 LINES TERMINATED BY '\n'
-IGNORE 1 ROWS
-;
+IGNORE 1 ROWS;
+
+INSERT INTO RTE_DATA (timestamp1,consommation)
+SELECT * FROM (SELECT 14322 AS timestamp1, 3423 AS consommation) AS temp
+WHERE NOT EXISTS (
+    SELECT timestamp1 FROM RTE_DATA WHERE timestamp1 = 14322
+) LIMIT 1;
 
 LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/RTE_data.csv' IGNORE
 INTO TABLE RTE_DATA 
@@ -25,4 +30,6 @@ IGNORE 1 ROWS;
 SELECT * FROM rte_data;
 
 SHOW VARIABLES LIKE "secure_file_priv";
+
+SHOW VARIABLE;
 
