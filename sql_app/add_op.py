@@ -7,8 +7,7 @@ import threading
 import numpy as np
 import httplib2
 import csv
-from db import mysql
-import pymysql
+
 
 # Le mieux pour créer contextes manuellement : avec context lib
 

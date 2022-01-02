@@ -1,14 +1,3 @@
-import pymysql
-import httplib2
-from modifxlsl import *
-from app import app
-from db import mysql
-from flask import json
-from flask import request
-import cryptography
-
-import asyncio
-
 # on veut exécuter 2 fonctions asynchrone
 # on ne veut pas de fonction app.run qui prenne le contrôle
 # serveur web asynchrone, lancer les 2 tâches en parallèle
@@ -17,11 +6,12 @@ import asyncio
 # awaitable asyncio.gather(*aws, return_exceptions=False)
 # trouver fonction qui lance run de manière asynchrone 
 
+'''
 h : httplib2.Http = httplib2.Http('.cache')
 
 conn = mysql.connect()
 cursor = conn.cursor(pymysql.cursors.DictCursor)
-
+ 
 def periodic(period):
     def scheduler(fcn):
 
@@ -38,7 +28,9 @@ def periodic(period):
 @periodic(15*60)
 async def update(*args, **kwargs):
     update_db(*args,**kwargs)
+'''
 
+'''
 @app.route('/electricity_consumption/')
 def index(): 
     
@@ -54,13 +46,13 @@ def index():
 
     if n>=1 :
 
-        cursor.execute('''
+        cursor.execute(
         SELECT
         FROM_UNIXTIME(timestamp1, '%%Y-%%m-%%dT%%H:%%i') AS date_converted, 
         consommation
         FROM RTE_dATA
         WHERE timestamp1 > UNIX_TIMESTAMP() - %(n)s * 3600
-        ORDER BY timestamp1 DESC;''', 
+        ORDER BY timestamp1 DESC;, 
         {'n' : n})
 
         results=cursor.fetchall() # autre méthode pour fetcher au fur et à mesure
@@ -73,6 +65,8 @@ def index():
         
 
     return json.dumps(data)
+
+'''
 
 if __name__ == '__main__':
     app.run()
