@@ -9,6 +9,14 @@ import cryptography
 
 import asyncio
 
+# on veut exécuter 2 fonctions asynchrone
+# on ne veut pas de fonction app.run qui prenne le contrôle
+# serveur web asynchrone, lancer les 2 tâches en parallèle
+# framework HTTP qui puisse lancer le code de manière asynchrone
+# fonction run qui prenne une coroutine + fonction asyncio qui collecte 2 tâches
+# awaitable asyncio.gather(*aws, return_exceptions=False)
+# trouver fonction qui lance run de manière asynchrone 
+
 h : httplib2.Http = httplib2.Http('.cache')
 
 conn = mysql.connect()
@@ -26,7 +34,6 @@ def periodic(period):
         return wrapper
 
     return scheduler
-
 
 @periodic(15*60)
 async def update(*args, **kwargs):
@@ -69,5 +76,6 @@ def index():
 
 if __name__ == '__main__':
     app.run()
+    print("coucou")
     asyncio.run(update(cursor,h))
 

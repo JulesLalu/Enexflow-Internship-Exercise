@@ -1,3 +1,4 @@
+from typing import Dict, Iterator
 from zipfile import ZipFile
 from io import BytesIO
 from datetime import datetime
@@ -9,19 +10,21 @@ import csv
 from db import mysql
 import pymysql
 
+# Le mieux pour créer contextes manuellement : avec context lib
 
 class Datapoint :
     def __init__(self, timestamp, consommation):
         self.timestamp = timestamp
         self.consommation = consommation
         
-def download_data(h : httplib2.Http):
+def download_data(h : httplib2.Http ) -> bytes :
     '''
     This function downloads data from RTE url and returns the content as bytes
     '''
     actual_date = datetime.today().strftime('%d/%m/%Y')
     response, content = h.request('https://eco2mix.rte-france.com/curves/eco2mixDl?date={}'.format(actual_date))
     return content
+    #déclarer types de sortie
 
 def parse_data(content : bytes) :
     '''
@@ -30,8 +33,12 @@ def parse_data(content : bytes) :
     zipfile = ZipFile(BytesIO(content))
     with zipfile.open(zipfile.namelist()[0]) as a_file : 
         spamreader = csv.DictReader(TextIOWrapper(a_file, 'latin-1'), delimiter = '\t')
-        list_elmt = [row for row in spamreader]
-    return list_elmt
+        return list(spamreader) 
+
+    # sinon changer de structure pour que le zipfile.open ne soit pas à l'intérieur de la fonction, mais plutôt renvoyer un contexte
+    # mais mieux de return iterator plutôt que liste
+    # mieux pour return une list à partir d'un generator
+    # pas besoin d'affecter la variable avant de la return
 
 def into_timestamp(date : str, time : str) :
     '''
@@ -42,17 +49,16 @@ def into_timestamp(date : str, time : str) :
     timestamp = int(datetime.timestamp(date_time_obj))
     return timestamp
 
-def conso_datapoint(spamreader : csv.DictReader) :
+def conso_datapoint(spamreader : Iterator[Dict]) : # mauvais type est déclaré ! + Ne pas s'engager à ce que ça soit un csv : on peut déclarer itérateur unniquement
     '''
     A generator that takes into argument the raw list and returns a Datapoint with a timestamp and consumption number
     '''
     for row in spamreader :
         if row['Heures']==None or row['Consommation']=='' :
             break
-        data_elmt = Datapoint(0,0)
-        data_elmt.timestamp = into_timestamp(row['Date'],row['Heures'])
-        data_elmt.consommation = int(row['Consommation'])
-        yield data_elmt
+        timestamp = into_timestamp(row['Date'],row['Heures'])
+        consommation = int(row['Consommation'])
+        yield Datapoint(timestamp,consommation)
 
 def final_dataset(spamreader : csv.DictReader) :
     '''
@@ -61,6 +67,8 @@ def final_dataset(spamreader : csv.DictReader) :
     gen_datapoint = conso_datapoint(spamreader)
     final_shape =[{'Timestamp' : row.timestamp , 'Consommation' : row.consommation} for row in gen_datapoint]
     return final_shape
+
+    #naviguer uniquement avec ctrl click
 
 def add_table(cursor) :
     '''
