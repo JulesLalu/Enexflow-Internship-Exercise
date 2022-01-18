@@ -6,70 +6,41 @@
 # awaitable asyncio.gather(*aws, return_exceptions=False)
 # trouver fonction qui lance run de manière asynchrone 
 
-'''
-h : httplib2.Http = httplib2.Http('.cache')
+from typing import List, Optional
 
-conn = mysql.connect()
-cursor = conn.cursor(pymysql.cursors.DictCursor)
- 
-def periodic(period):
-    def scheduler(fcn):
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
+import httplib2
+import crud, models
+from database import SessionLocal, engine
+import json
+from fastapi_utils.tasks import repeat_every
+import uvicorn
 
-        async def wrapper(*args, **kwargs):
+models.Base.metadata.create_all(bind=engine)
 
-            while True:
-                asyncio.create_task(fcn(*args, **kwargs))
-                await asyncio.sleep(period)
+app = FastAPI()
 
-        return wrapper
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-    return scheduler
+h = httplib2.Http()
 
-@periodic(15*60)
-async def update(*args, **kwargs):
-    update_db(*args,**kwargs)
-'''
+@app.on_event("startup")
+@repeat_every(seconds=15 * 60)
+def update(db : Session = Depends(get_db)):
+    return crud.update_db(db, h)
 
-'''
-@app.route('/electricity_consumption/')
-def index(): 
-    
-    data = {}
-    rq=request.args.get('n')
 
-    try :
-        n = int(rq)
-    except TypeError :
-        return {'Error' : 'Please specify a value for n'}
-    except ValueError :
-        return {'Error' : 'n must be an integer'}
-
-    if n>=1 :
-
-        cursor.execute(
-        SELECT
-        FROM_UNIXTIME(timestamp1, '%%Y-%%m-%%dT%%H:%%i') AS date_converted, 
-        consommation
-        FROM RTE_dATA
-        WHERE timestamp1 > UNIX_TIMESTAMP() - %(n)s * 3600
-        ORDER BY timestamp1 DESC;, 
-        {'n' : n})
-
-        results=cursor.fetchall() # autre méthode pour fetcher au fur et à mesure
-        for i in range(len(results)) :
-            data[str(results[i]['date_converted'])] = results[i]['consommation']
-    
-    else :   
-        data['Error'] = 'The parameter n is out of range !'
-
-        
-
-    return json.dumps(data)
-
-'''
+@app.get('/electricity_consumption/')
+def get_hours(n : Optional[int] = None,  db : Session = Depends(get_db)): 
+    data = crud.get_hours(db, n = n)
+    return data
 
 if __name__ == '__main__':
-    app.run()
-    print("coucou")
-    asyncio.run(update(cursor,h))
-
+    uvicorn.run(app, host="localhost", port=5000)

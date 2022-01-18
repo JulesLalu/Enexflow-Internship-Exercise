@@ -1,4 +1,5 @@
-from typing import Dict, Iterator
+from asyncio.streams import StreamReader
+from typing import Dict, List
 from zipfile import ZipFile
 from io import BytesIO
 from datetime import datetime
@@ -13,9 +14,16 @@ import csv
 
 class Datapoint :
     def __init__(self, timestamp, consommation):
-        self.timestamp = timestamp
-        self.consommation = consommation
+        self.timestamp : int = timestamp
+        self.consommation : int = consommation
         
+def context(Bytesfile : bytes) -> StreamReader :
+    '''
+    This function returns the context to use for parsing the file
+    '''
+    zipfile = ZipFile(BytesIO(Bytesfile))
+    return zipfile.open(zipfile.namelist()[0])
+
 def download_data(h : httplib2.Http ) -> bytes :
     '''
     This function downloads data from RTE url and returns the content as bytes
@@ -23,23 +31,8 @@ def download_data(h : httplib2.Http ) -> bytes :
     actual_date = datetime.today().strftime('%d/%m/%Y')
     response, content = h.request('https://eco2mix.rte-france.com/curves/eco2mixDl?date={}'.format(actual_date))
     return content
-    #déclarer types de sortie
 
-def parse_data(content : bytes) :
-    '''
-    This function takes as input the data content as bytes, and returns it as a raw list of dictionaries, with every column of the initial file
-    '''
-    zipfile = ZipFile(BytesIO(content))
-    with zipfile.open(zipfile.namelist()[0]) as a_file : 
-        spamreader = csv.DictReader(TextIOWrapper(a_file, 'latin-1'), delimiter = '\t')
-        return list(spamreader) 
-
-    # sinon changer de structure pour que le zipfile.open ne soit pas à l'intérieur de la fonction, mais plutôt renvoyer un contexte
-    # mais mieux de return iterator plutôt que liste
-    # mieux pour return une list à partir d'un generator
-    # pas besoin d'affecter la variable avant de la return
-
-def into_timestamp(date : str, time : str) :
+def into_timestamp(date : str, time : str) -> int:
     '''
     This function converts a date + hours into a timestamp
     '''
@@ -48,26 +41,19 @@ def into_timestamp(date : str, time : str) :
     timestamp = int(datetime.timestamp(date_time_obj))
     return timestamp
 
-def conso_datapoint(spamreader : Iterator[Dict]) : # mauvais type est déclaré ! + Ne pas s'engager à ce que ça soit un csv : on peut déclarer itérateur unniquement
+def conso_datapoint(content : bytes) -> Datapoint :
     '''
-    A generator that takes into argument the raw list and returns a Datapoint with a timestamp and consumption number
+    A generator that takes into argument the content as bytes and directly returns 
     '''
-    for row in spamreader :
-        if row['Heures']==None or row['Consommation']=='' :
-            break
-        timestamp = into_timestamp(row['Date'],row['Heures'])
-        consommation = int(row['Consommation'])
-        yield Datapoint(timestamp,consommation)
+    with context(content) as a_file :
+        spamreader = csv.DictReader(TextIOWrapper(a_file, 'latin-1'), delimiter = '\t')
+        for row in spamreader :
+            if row['Heures']==None or row['Consommation']=='' :
+                break
+            timestamp = into_timestamp(row['Date'],row['Heures'])
+            consommation = int(row['Consommation'])
+            yield Datapoint(timestamp,consommation)
 
-def final_dataset(spamreader : csv.DictReader) :
-    '''
-    This function takes into argument the raw list of dictionaries and returns its data in its final shape
-    '''
-    gen_datapoint = conso_datapoint(spamreader)
-    final_shape =[{'Timestamp' : row.timestamp , 'Consommation' : row.consommation} for row in gen_datapoint]
-    return final_shape
-
-    #naviguer uniquement avec ctrl click
 
 def add_table(cursor) :
     '''
@@ -95,12 +81,10 @@ def update_db(cursor, h) :
     This function concatenates the previous functions
     '''
     add_table(cursor)
-    print("hello")
     file = download_data(h)
-    dataset_raw = parse_data(file)
-    final = final_dataset(dataset_raw)
     add_to_db(final,cursor)
     return None
+
 
 
 #formatage de requête sql
