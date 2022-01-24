@@ -1,36 +1,57 @@
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, List
 from datetime import datetime
-import models
-from sqlalchemy.sql.expression import desc
 from asyncio.streams import StreamReader
 from zipfile import ZipFile
 from io import BytesIO
 from io import TextIOWrapper
-import threading
-import numpy as np
+import MySQLdb
 import httplib2
 import csv
-from add_op import Datapoint
-from models import Conso_Datapoint
+from pypika import Query, Table, Order
+import json
+import MySQLdb.connections
 
 # Le mieux pour créer contextes manuellement : avec context lib
 
 #fetch last n hours task
+rte_data = Table('RTE_DATA')
 
-def get_hours(db : Session, n : Optional[int] = None) -> dict:
-    
+def get_hours(mydb : MySQLdb.connections.Connection, n : Optional[int] = None) -> Dict:
+    '''
+    Get the data that was previously imported in the database
+    '''
     if n==None :
         return {'Error' : 'Please specify a value for n'}
 
     else :
-        dict1 = db.query(models.Conso_Datapoint.timestamp1, models.Conso_Datapoint.consommation) \
-            .filter(models.Conso_Datapoint.timestamp1 > datetime.timestamp(datetime.now()) - n * 3600) \
-            .order_by(models.Conso_Datapoint.timestamp1, desc(models.Conso_Datapoint.timestamp1)) 
-        for key in dict1 :
-            dict1[key.strftime("%m/%d/%Y, %H:%M:%S")] = dict1.pop(key)
-            #ne pas mettre à jour un dictionnaire : penser programmation fonctionnelle ! Penser en constante plutôt qu'en variable
-        return dict1
+        data = {}
+        cursor = mydb.cursor()
+        query = Query.from_(rte_data).select(
+            #datetime.fromtimestamp(rte_data.timestamp1).strftime("%m/%d/%Y, %H:%M:%S"), 
+            rte_data.timestamp1,
+            rte_data.consommation
+            ).where(
+                rte_data.timestamp1 > datetime.timestamp(datetime.now()) - n * 3600
+            ).orderby(
+                rte_data.timestamp1, order = Order.desc
+            )
+        cursor.execute(str(query))
+        mydb.commit()
+        cursor.close()
+        results=cursor.fetchall() # autre méthode pour fetcher au fur et à mesure
+        for i in range(len(results)) :
+            data[str(results[i]['date_converted'])] = results[i]['consommation']
+
+        return json.dumps(data)
+
+        # dict1 = db.query(models.Conso_Datapoint.timestamp1, models.Conso_Datapoint.consommation) \
+        #     .filter(models.Conso_Datapoint.timestamp1 > datetime.timestamp(datetime.now()) - n * 3600) \
+        #     .order_by(models.Conso_Datapoint.timestamp1, desc(models.Conso_Datapoint.timestamp1)) 
+        # for key in dict1 :
+        #     dict1[key.strftime("%m/%d/%Y, %H:%M:%S")] = dict1.pop(key)
+        #     ne pas mettre à jour un dictionnaire : penser programmation fonctionnelle ! Penser en constante plutôt qu'en variable
+        # return dict1
 
 
 #update db task
@@ -77,15 +98,15 @@ def conso_datapoint(content : bytes) -> Datapoint :
             consommation = int(row['Consommation'])
             yield Datapoint(timestamp,consommation)
 
-def create_datapoint(db : Session, NewRow : Datapoint) -> Conso_Datapoint:
-    exists = db.query(models.Conso_Datapoint.timestamp1).filter_by(timestamp1=NewRow.timestamp).first()  
-    #pas besoin si on a déjà la bonne clé primaire -> regarder avec Pypyka     
-    if not exists:
-        db_datapoint = models.Conso_Datapoint(timestamp1 = NewRow.timestamp, consommation = NewRow.consommation)
-        db.add(db_datapoint)
-        db.commit()
-        db.refresh(db_datapoint)
-        return db_datapoint
+def create_datapoint(mydb : MySQLdb.connections.Connection, NewRow : Datapoint) -> None:
+    cursor = mydb.cursor()
+    query = Query.into(rte_data)\
+        .insert(NewRow.timestamp, NewRow.consommation)\
+        .on_duplicate_key_update(rte_data.consommation, Values(rte_data.consommation))
+    cursor.execute(query)
+    mydb.commit()
+    cursor.close()
+    return None
 
 def update_db(db : Session, h : httplib2.Http) -> str :
     file = download_data(h)

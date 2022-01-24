@@ -11,23 +11,21 @@ from typing import List, Optional
 from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 import httplib2
-import crud, models
-from database import SessionLocal, engine
-import json
+import crud
 from fastapi_utils.tasks import repeat_every
 import uvicorn
-
-models.Base.metadata.create_all(bind=engine)
+import MySQLdb
+import MySQLdb.connections
 
 app = FastAPI()
 
 # Dependency
 def get_db():
-    db = SessionLocal()
+    mydb = MySQLdb.connect(host='127.0.0.1', user='root', passwd='Crefolet75$', db='rte', charset="utf8")
     try:
-        yield db
+        yield mydb
     finally:
-        db.close()
+        mydb.close()
 
 h = httplib2.Http()
 
@@ -38,7 +36,7 @@ def update(db : Session = Depends(get_db)):
 
 
 @app.get('/electricity_consumption/')
-def get_hours(n : Optional[int] = None,  db : Session = Depends(get_db)): 
+def get_hours(n : Optional[int] = None,  db : MySQLdb.connections.Connection = Depends(get_db)): 
     data = crud.get_hours(db, n = n)
     return data
 
