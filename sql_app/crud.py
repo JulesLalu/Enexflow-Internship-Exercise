@@ -1,6 +1,4 @@
-from optparse import Values
-from sqlalchemy.orm import Session
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 from datetime import datetime
 from asyncio.streams import StreamReader
 from zipfile import ZipFile
@@ -10,7 +8,6 @@ import MySQLdb
 import httplib2
 import csv
 from pypika import Query, Table, Order, MySQLQuery
-import json
 import MySQLdb.connections
 
 # Le mieux pour créer contextes manuellement : avec context lib

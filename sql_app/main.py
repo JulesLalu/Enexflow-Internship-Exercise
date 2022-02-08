@@ -1,15 +1,6 @@
-# on veut exécuter 2 fonctions asynchrone
-# on ne veut pas de fonction app.run qui prenne le contrôle
-# serveur web asynchrone, lancer les 2 tâches en parallèle
-# framework HTTP qui puisse lancer le code de manière asynchrone
-# fonction run qui prenne une coroutine + fonction asyncio qui collecte 2 tâches
-# awaitable asyncio.gather(*aws, return_exceptions=False)
-# trouver fonction qui lance run de manière asynchrone 
+from typing import Optional
 
-from typing import List, Optional
-
-from fastapi import Depends, FastAPI, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import Depends, FastAPI
 import httplib2
 import crud
 from fastapi_utils.tasks import repeat_every
@@ -17,7 +8,6 @@ import uvicorn
 import MySQLdb
 import MySQLdb.connections
 from fastapi.middleware.cors import CORSMiddleware
-import json
 import os
 
 #ensemble des var.env. de l'environnement donné (shell) -> variables définies très haut dans système d'exploitation
