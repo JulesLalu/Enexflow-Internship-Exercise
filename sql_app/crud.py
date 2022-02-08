@@ -1,3 +1,4 @@
+from optparse import Values
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, List
 from datetime import datetime
@@ -8,7 +9,7 @@ from io import TextIOWrapper
 import MySQLdb
 import httplib2
 import csv
-from pypika import Query, Table, Order
+from pypika import Query, Table, Order, MySQLQuery
 import json
 import MySQLdb.connections
 
@@ -25,10 +26,9 @@ def get_hours(mydb : MySQLdb.connections.Connection, n : Optional[int] = None) -
         return {'Error' : 'Please specify a value for n'}
 
     else :
-        data = {}
+        data = []
         cursor = mydb.cursor()
         query = Query.from_(rte_data).select(
-            #datetime.fromtimestamp(rte_data.timestamp1).strftime("%m/%d/%Y, %H:%M:%S"), 
             rte_data.timestamp1,
             rte_data.consommation
             ).where(
@@ -36,23 +36,13 @@ def get_hours(mydb : MySQLdb.connections.Connection, n : Optional[int] = None) -
             ).orderby(
                 rte_data.timestamp1, order = Order.desc
             )
-        cursor.execute(str(query))
+        cursor.execute(str(query).replace("\"", ""))
         mydb.commit()
-        cursor.close()
         results=cursor.fetchall() # autre méthode pour fetcher au fur et à mesure
         for i in range(len(results)) :
-            data[str(results[i]['date_converted'])] = results[i]['consommation']
-
-        return json.dumps(data)
-
-        # dict1 = db.query(models.Conso_Datapoint.timestamp1, models.Conso_Datapoint.consommation) \
-        #     .filter(models.Conso_Datapoint.timestamp1 > datetime.timestamp(datetime.now()) - n * 3600) \
-        #     .order_by(models.Conso_Datapoint.timestamp1, desc(models.Conso_Datapoint.timestamp1)) 
-        # for key in dict1 :
-        #     dict1[key.strftime("%m/%d/%Y, %H:%M:%S")] = dict1.pop(key)
-        #     ne pas mettre à jour un dictionnaire : penser programmation fonctionnelle ! Penser en constante plutôt qu'en variable
-        # return dict1
-
+            data.append({"date" : datetime.fromtimestamp(results[i][0]).strftime("%d-%m-%YT%H:%M"), "conso" : results[i][1]})
+        cursor.close()
+        return data
 
 #update db task
 
@@ -98,19 +88,17 @@ def conso_datapoint(content : bytes) -> Datapoint :
             consommation = int(row['Consommation'])
             yield Datapoint(timestamp,consommation)
 
-def create_datapoint(mydb : MySQLdb.connections.Connection, NewRow : Datapoint) -> None:
-    cursor = mydb.cursor()
-    query = Query.into(rte_data)\
+def create_datapoint(mydb : MySQLdb.connections.Connection, NewRow : Datapoint, cursor) -> None:
+    query = MySQLQuery.into(rte_data)\
         .insert(NewRow.timestamp, NewRow.consommation)\
-        .on_duplicate_key_update(rte_data.consommation, Values(rte_data.consommation))
-    cursor.execute(query)
+        .on_duplicate_key_update(rte_data.consommation, NewRow.consommation)
+    cursor.execute(str(query).replace("\'", ""))
     mydb.commit()
-    cursor.close()
-    return None
 
-def update_db(db : Session, h : httplib2.Http) -> str :
+def update_db(mydb : MySQLdb.connections.Connection, h : httplib2.Http) -> None :
     file = download_data(h)
+    cursor = mydb.cursor()
     for data_pt in conso_datapoint(file) :
-        create_datapoint(db, data_pt)
-    return 'db uploaded'
+        create_datapoint(mydb, data_pt, cursor)
+    cursor.close()
 
