@@ -61,6 +61,7 @@ def download_data(h : httplib2.Http ) -> bytes :
     '''
     actual_date = datetime.today().strftime('%d/%m/%Y')
     response, content = h.request('https://eco2mix.rte-france.com/curves/eco2mixDl?date={}'.format(actual_date))
+    #if content not null, then ou raise -> Types d'erreurs ont été écrits : on peut écrire des phrases
     return content
 
 def into_timestamp(date : str, time : str) -> int:

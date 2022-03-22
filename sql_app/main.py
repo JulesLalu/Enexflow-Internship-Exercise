@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, List
 
 from fastapi import Depends, FastAPI
 import httplib2
@@ -42,9 +42,14 @@ def update():
     mydb.close()
 
 @app.get('/electricity_consumption')
-def get_hours(n : Optional[int] = None,  db : MySQLdb.connections.Connection = Depends(get_db)): 
+def get_hours(n : Optional[int] = None,  db : MySQLdb.connections.Connection = Depends(get_db)) -> List[Dict[str, str or int]]: 
     data = crud.get_hours(db, n = n)
     return data
+
+@app.get('/refresh_conso')
+def update(db : MySQLdb.connections.Connection = Depends(get_db)) -> List[Dict[str, str]]:
+    crud.update_db(db, h)
+    return [{"state" : "Done fetching data from RTE"}]
 
 if __name__ == '__main__':
     uvicorn.run(app, host="localhost", port=5000)
